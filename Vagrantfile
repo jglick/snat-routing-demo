@@ -2,13 +2,14 @@
 
 # tested with Vagrant 1.3.2, VirtualBox 4.2.10
 
-@neta = '192.168.20'
-@netb = '192.168.21'
-@route = "#{@netb}.0 255.255.255.0"
-@netvpn = '192.168.30'
-@host = '10.0.2.2'
+@neta = '192.168.20' # first real subnet, with VPN server and undistinguished client
+@netb = '192.168.21' # second real subnet, with router machine (VPN client offering an iroute) and a service
+@netc = '192.168.21' # the subnet exposed as a route via VPN
+@route = "#{@netc}.0 255.255.255.0"
+@netvpn = '192.168.30' # the interfaces created for tun0
+@host = '10.0.2.2' # VirtualBox host, which we use to port-forward just the VPN
+@host_vpn_port = 11940 # a port on VBox host to use for the VPN
 @keys = '/usr/share/doc/openvpn/examples/sample-keys'
-@host_vpn_port = 11940
 
 Vagrant.configure("2") do |config|
 
@@ -85,7 +86,7 @@ apt-get -y install curl
 sleep 5
 route del default
 # TODO ‘push "route …"’ from server is not getting honored for some reason, hence this hack:
-route add -net #{@netb}.0 netmask 255.255.255.0 gw $(route | fgrep tun0 | fgrep -v \* | head -1 | cut -c17-32) || :
+route add -net #{@netc}.0 netmask 255.255.255.0 gw $(route | fgrep tun0 | fgrep -v \* | head -1 | cut -c17-32) || :
 SCRIPT_VPNCLIENT
   end
 
