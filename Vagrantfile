@@ -1,7 +1,5 @@
 # -*- mode: ruby; coding: utf-8 -*-
 
-# TODO iroute not being sent to either VPN client (and we need it sent only to router, not vpnclient)
-
 # tested with Vagrant 1.3.2, VirtualBox 4.2.10
 
 @neta = '192.168.20'
@@ -82,6 +80,9 @@ verb 3
 CONF_VPNCLIENT
 service openvpn restart
 route del default
+# TODO ‘push "route …"’ from server is not getting honored for some reason.
+# TODO the following hack does not seem to work, either:
+# route add -net #{@netb}.0 netmask 255.255.255.0 gw $(route | fgrep tun0 | fgrep -v \* | head -1 | cut -c17-32) || :
 SCRIPT_VPNCLIENT
   end
 
