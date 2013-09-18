@@ -56,6 +56,8 @@ duplicate-cn
 verb 3
 CONF_VPNSERVER
 service openvpn restart
+apt-get -y install curl
+# TODO it seems the following command is just ignored during provisioning?!
 route del default
 SCRIPT_VPNSERVER
 # logging goes to /var/log/syslog
@@ -79,10 +81,10 @@ key #{@keys}/client.key
 verb 3
 CONF_VPNCLIENT
 service openvpn restart
+apt-get -y install curl
 route del default
-# TODO ‘push "route …"’ from server is not getting honored for some reason.
-# TODO the following hack does not seem to work, either:
-# route add -net #{@netb}.0 netmask 255.255.255.0 gw $(route | fgrep tun0 | fgrep -v \* | head -1 | cut -c17-32) || :
+# TODO ‘push "route …"’ from server is not getting honored for some reason, hence this hack:
+route add -net #{@netb}.0 netmask 255.255.255.0 gw $(route | fgrep tun0 | fgrep -v \* | head -1 | cut -c17-32) || :
 SCRIPT_VPNCLIENT
   end
 
