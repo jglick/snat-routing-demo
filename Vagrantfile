@@ -1,5 +1,8 @@
 # -*- mode: ruby; coding: utf-8 -*-
 
+# TODO iroute not being sent to either VPN client (and we need it sent only to router, not vpnclient)
+# TODO VirtualBox seems to allow any of the machines to ping one another, even across networks, without the VPN even running
+
 # tested with Vagrant 1.3.2, VirtualBox 4.2.10
 
 @neta = '192.168.20'
