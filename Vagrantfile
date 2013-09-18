@@ -1,7 +1,6 @@
 # -*- mode: ruby; coding: utf-8 -*-
 
 # TODO iroute not being sent to either VPN client (and we need it sent only to router, not vpnclient)
-# TODO VirtualBox seems to allow any of the machines to ping one another, even across networks, without the VPN even running
 
 # tested with Vagrant 1.3.2, VirtualBox 4.2.10
 
@@ -33,6 +32,8 @@ Vagrant.configure("2") do |config|
     config.vm.network :private_network, ip: "#{@neta}.10"
     config.vm.network :forwarded_port, guest: 1194, host: @host_vpn_port
     config.vm.provision :shell, inline: <<SCRIPT_VPNSERVER
+# during reprovisioning temporarily undoes route del default, so that machines cannot cheat and talk to one another across networks via host:
+route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install openvpn
 mkdir -p /etc/openvpn
 cat > /etc/openvpn/client-connect.sh <<'CLIENT_CONNECT'
@@ -57,6 +58,7 @@ duplicate-cn
 verb 3
 CONF_VPNSERVER
 service openvpn restart
+route del default
 SCRIPT_VPNSERVER
 # logging goes to /var/log/syslog
   end
@@ -65,6 +67,7 @@ SCRIPT_VPNSERVER
     config.vm.host_name = 'vpnclient'
     config.vm.network :private_network, ip: "#{@neta}.11"
     config.vm.provision :shell, inline: <<SCRIPT_VPNCLIENT
+route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install openvpn
 mkdir -p /etc/openvpn
 cat > /etc/openvpn/bridge.conf <<CONF_VPNCLIENT
@@ -78,6 +81,7 @@ key #{@keys}/client.key
 verb 3
 CONF_VPNCLIENT
 service openvpn restart
+route del default
 SCRIPT_VPNCLIENT
   end
 
@@ -85,6 +89,7 @@ SCRIPT_VPNCLIENT
     config.vm.host_name = 'router'
     config.vm.network :private_network, ip: "#{@netb}.10"
     config.vm.provision :shell, inline: <<SCRIPT_ROUTER
+route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install openvpn
 mkdir -p /etc/openvpn
 cat > /etc/openvpn/bridge.conf <<CONF_ROUTER
@@ -101,6 +106,7 @@ service openvpn restart
 sysctl -w net.ipv4.ip_forward=1
 iptables -t nat -F
 iptables -t nat -A POSTROUTING -s #{@netvpn}.0/24 -j SNAT --to-source #{@netb}.10
+route del default
 SCRIPT_ROUTER
   end
 
@@ -108,7 +114,9 @@ SCRIPT_ROUTER
     config.vm.host_name = 'service'
     config.vm.network :private_network, ip: "#{@netb}.11"
     config.vm.provision :shell, inline: <<SCRIPT_SERVICE
+route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install lighttpd
+route del default
 SCRIPT_SERVICE
   end
 
