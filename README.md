@@ -8,7 +8,7 @@ Demo (tested with Vagrant 1.3.2, VirtualBox 4.2.10):
     curl -I http://192.168.22.11/
     tracepath 192.168.22.11
 
-This should go through the VPN running on ‘vpnserver’, SNAT’d and NETMAP’d through ‘router’, to ‘service’ and back.
+This should go through the VPN running on `vpnserver`, with `SNAT` and `NETMAP` applied by `router`, to `service` and back.
 
 (VPN logging goes to `/var/log/syslog`, and connected client list to `/var/run/openvpn.bridge.status`.)
 
