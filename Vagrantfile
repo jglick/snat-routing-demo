@@ -2,7 +2,7 @@
 
 @neta = '192.168.20' # first real subnet, with VPN server and undistinguished client
 @netb = '192.168.21' # second real subnet, with router machine (VPN client offering an iroute) and a service
-@netc = '192.168.21' # the subnet exposed as a route via VPN
+@netc = '192.168.22' # the subnet exposed as a route via VPN
 @route = "#{@netc}.0 255.255.255.0"
 @netvpn = '192.168.30' # the interfaces created for tun0
 @host = '10.0.2.2' # VirtualBox host, which we use to port-forward just the VPN
@@ -64,6 +64,7 @@ SCRIPT_VPNSERVER
     config.vm.provision :shell, inline: <<SCRIPT_VPNCLIENT
 route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install openvpn curl
+# TODO despite repeated attempts, the default route keeps on getting injected by something, I think openvpn:
 route del default
 mkdir -p /etc/openvpn
 # We use a distinct certificate here (CN=Test-Client-Password) merely to distinguish it from router, which is in client-config-dir for iroute:
@@ -104,6 +105,7 @@ CONF_ROUTER
 service openvpn restart
 sysctl -w net.ipv4.ip_forward=1
 iptables -t nat -F
+iptables -t nat -A PREROUTING -d #{@netc}.0/24 -j NETMAP --to #{@netb}.0/24
 iptables -t nat -A POSTROUTING -s #{@netvpn}.0/24 -j SNAT --to-source #{@netb}.10
 SCRIPT_ROUTER
   end
