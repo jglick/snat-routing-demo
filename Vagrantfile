@@ -33,11 +33,20 @@ Vagrant.configure("2") do |config|
     config.vm.provision :shell, inline: <<SCRIPT_VPNSERVER
 # during reprovisioning temporarily undoes route del default, so that machines cannot cheat and talk to one another across networks via host:
 route add -net default gw #{@host} dev eth0 2>&- || :
-apt-get -y install openvpn
+apt-get -y install openvpn curl
+route del default
 mkdir -p /etc/openvpn
+rm -f /tmp/client-connected-flag
 cat > /etc/openvpn/client-connect.sh <<'CLIENT_CONNECT'
 #!/bin/sh
-echo iroute #{@route} >> $1
+# TODO stateful hack—assumes that vpnserver, vpnclient, and router are all (re-)provisioned in that order
+# better to replace client-connect with client-config-dir, and either create actual distinct certificates for vpnclient vs. router (such as using askpass FILE and pass.crt/pass.key), or use username/password authentication if possible
+if [ -f /tmp/client-connected-flag ]
+then
+    echo iroute #{@route} >> $1
+else
+    touch /tmp/client-connected-flag
+fi
 CLIENT_CONNECT
 chmod a+x /etc/openvpn/client-connect.sh
 cat > /etc/openvpn/bridge.conf <<CONF_VPNSERVER
@@ -57,9 +66,6 @@ duplicate-cn
 verb 3
 CONF_VPNSERVER
 service openvpn restart
-apt-get -y install curl
-sleep 5 # let VPN start up; otherwise routes seem to be clobbered; TODO how can this be done more reliably?
-route del default
 SCRIPT_VPNSERVER
 # logging goes to /var/log/syslog
   end
@@ -69,7 +75,8 @@ SCRIPT_VPNSERVER
     config.vm.network :private_network, ip: "#{@neta}.11"
     config.vm.provision :shell, inline: <<SCRIPT_VPNCLIENT
 route add -net default gw #{@host} dev eth0 2>&- || :
-apt-get -y install openvpn
+apt-get -y install openvpn curl
+route del default
 mkdir -p /etc/openvpn
 cat > /etc/openvpn/bridge.conf <<CONF_VPNCLIENT
 client
@@ -82,11 +89,6 @@ key #{@keys}/client.key
 verb 3
 CONF_VPNCLIENT
 service openvpn restart
-apt-get -y install curl
-sleep 5
-route del default
-# TODO ‘push "route …"’ from server is not getting honored for some reason, hence this hack:
-route add -net #{@netc}.0 netmask 255.255.255.0 gw $(route | fgrep tun0 | fgrep -v \* | head -1 | cut -c17-32) || :
 SCRIPT_VPNCLIENT
   end
 
@@ -96,6 +98,7 @@ SCRIPT_VPNCLIENT
     config.vm.provision :shell, inline: <<SCRIPT_ROUTER
 route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install openvpn
+route del default
 mkdir -p /etc/openvpn
 cat > /etc/openvpn/bridge.conf <<CONF_ROUTER
 client
@@ -111,8 +114,6 @@ service openvpn restart
 sysctl -w net.ipv4.ip_forward=1
 iptables -t nat -F
 iptables -t nat -A POSTROUTING -s #{@netvpn}.0/24 -j SNAT --to-source #{@netb}.10
-sleep 5
-route del default
 SCRIPT_ROUTER
   end
 
