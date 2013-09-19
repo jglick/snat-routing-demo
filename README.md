@@ -16,7 +16,7 @@ But it may suffice to just set
 
     @netc = '192.168.22'
 
-and then try to make ‘router’ convert those packets to `@netb`. If successful,
+and then try to edit `SCRIPT_ROUTER` to make ‘router’ convert those packets to `@netb`. If successful,
 
     curl -I http://192.168.22.11/
 
