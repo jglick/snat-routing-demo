@@ -1,7 +1,5 @@
 # -*- mode: ruby; coding: utf-8 -*-
 
-# tested with Vagrant 1.3.2, VirtualBox 4.2.10
-
 @neta = '192.168.20' # first real subnet, with VPN server and undistinguished client
 @netb = '192.168.21' # second real subnet, with router machine (VPN client offering an iroute) and a service
 @netc = '192.168.21' # the subnet exposed as a route via VPN
@@ -31,24 +29,13 @@ Vagrant.configure("2") do |config|
     config.vm.network :private_network, ip: "#{@neta}.10"
     config.vm.network :forwarded_port, guest: 1194, host: @host_vpn_port
     config.vm.provision :shell, inline: <<SCRIPT_VPNSERVER
-# during reprovisioning temporarily undoes route del default, so that machines cannot cheat and talk to one another across networks via host:
+# during reprovisioning temporarily undoes route del default so we can use apt:
 route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install openvpn curl
+# so that machines cannot cheat and talk to one another across networks via host:
 route del default
-mkdir -p /etc/openvpn
-rm -f /tmp/client-connected-flag
-cat > /etc/openvpn/client-connect.sh <<'CLIENT_CONNECT'
-#!/bin/sh
-# TODO stateful hack—assumes that vpnserver, vpnclient, and router are all (re-)provisioned in that order
-# better to replace client-connect with client-config-dir, and either create actual distinct certificates for vpnclient vs. router (such as using askpass FILE and pass.crt/pass.key), or use username/password authentication if possible
-if [ -f /tmp/client-connected-flag ]
-then
-    echo iroute #{@route} >> $1
-else
-    touch /tmp/client-connected-flag
-fi
-CLIENT_CONNECT
-chmod a+x /etc/openvpn/client-connect.sh
+mkdir -p /etc/openvpn/ccd
+# could also use username/password authentication, but easy enough to take advantage of existing demo certificates
 cat > /etc/openvpn/bridge.conf <<CONF_VPNSERVER
 server #{@netvpn}.0 255.255.255.0
 proto tcp
@@ -57,17 +44,18 @@ client-to-client
 route #{@route}
 push "route #{@route}"
 script-security 2
-client-connect /etc/openvpn/client-connect.sh
+client-config-dir /etc/openvpn/ccd
 ca #{@keys}/ca.crt
 cert #{@keys}/server.crt
 key #{@keys}/server.key
 dh #{@keys}/dh1024.pem
-duplicate-cn
 verb 3
 CONF_VPNSERVER
+cat > /etc/openvpn/ccd/Test-Client <<CONF_CCD
+iroute #{@route}
+CONF_CCD
 service openvpn restart
 SCRIPT_VPNSERVER
-# logging goes to /var/log/syslog
   end
 
   config.vm.define :vpnclient do |config|
@@ -78,14 +66,17 @@ route add -net default gw #{@host} dev eth0 2>&- || :
 apt-get -y install openvpn curl
 route del default
 mkdir -p /etc/openvpn
+# We use a distinct certificate here (CN=Test-Client-Password) merely to distinguish it from router, which is in client-config-dir for iroute:
+echo password > /etc/openvpn/password
 cat > /etc/openvpn/bridge.conf <<CONF_VPNCLIENT
 client
 dev tun
 remote #{@host} #{@host_vpn_port} tcp
 ns-cert-type server
 ca #{@keys}/ca.crt
-cert #{@keys}/client.crt
-key #{@keys}/client.key
+cert #{@keys}/pass.crt
+key #{@keys}/pass.key
+askpass /etc/openvpn/password
 verb 3
 CONF_VPNCLIENT
 service openvpn restart

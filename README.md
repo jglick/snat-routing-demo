@@ -1,13 +1,14 @@
 [Background question](http://serverfault.com/questions/539710/iptables-combine-snat-with-network-remapping-for-openvpn)
 
-Demo:
+Demo (tested with Vagrant 1.3.2, VirtualBox 4.2.10):
 
     vagrant up --provision
     vagrant ssh vpnserver # or vpnclient
-    route # make sure there is no default route; ‘route del default’ as needed
     curl -I http://192.168.21.11/
 
 This should go through the VPN running on ‘vpnserver’, SNAT’d through ‘router’, to ‘service’ and back.
+
+(VPN logging goes to `/var/log/syslog`, and connected client list to `/var/run/openvpn.bridge.status`.)
 
 Then the question becomes how to make the same thing work in case `@netb == @neta` rather than being distinct IP ranges.
 Probably Vagrant is incapable of simulating this, since it autocreates host-only networks based on the first three quads of a requested IP address.
